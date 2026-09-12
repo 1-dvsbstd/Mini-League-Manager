@@ -1663,7 +1663,7 @@
             gap: 8px;
             margin-top: 12px;
         }
-        .period-prize-grid.count-1 { grid-template-columns: minmax(0, 220px); justify-content: center; }
+        .period-prize-grid.count-1 { grid-template-columns: 1fr; }
         .period-prize-grid.count-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
         .period-prize {
@@ -2858,7 +2858,8 @@
                                     ${rankedPeriodScores.map((s, idx) => {
                                         const scoreDisplay = s.numericScore === null ? '–' : String(s.numericScore);
                                         const teamName = escapeProfileHtml(s.teamName || '');
-                                        const scoreColour = idx === 0 ? 'var(--gold-color)' : (idx === 1 ? 'var(--silver-color)' : (idx === 2 ? '#d69a65' : 'var(--text-color)'));
+                                        const paidPlaces = (period.payouts || []).length;
+                                        const scoreColour = idx < paidPlaces ? (idx === 0 ? 'var(--gold-color)' : (idx === 1 ? 'var(--silver-color)' : '#d69a65')) : 'var(--text-muted)';
                                         const gameweekPoints = containsLatestGameweek
                                             ? latestGameweekPointsMap[String(s.managerId)]
                                             : null;
@@ -2940,6 +2941,8 @@
                         </div>
                         <div class="overall-standing-list">
                                     ${data.overall.rows.map((row, rIdx) => {
+                                        const paidPlaces = (data.overall.payouts || []).length;
+                                        const prizeRank = rIdx < paidPlaces ? rIdx + 1 : 0;
                                         const playerName = row[playerIdx] || '';
                                         const points = row[pointsIdx] !== undefined ? row[pointsIdx] : '';
                                         const teamName = escapeProfileHtml(row[6] || '');
@@ -2950,7 +2953,7 @@
                                             : `${gameweekPoints >= 0 ? '+' : ''}${gameweekPoints}`;
 
                                         return `
-                                            <div class="overall-standing-tile rank-${rIdx + 1}">
+                                            <div class="overall-standing-tile rank-${prizeRank}">
                                                 <div><div class="overall-tile-name">${escapeProfileHtml(playerName)}</div>${teamName ? `<div class="overall-tile-team">${teamName}</div>` : ''}</div>
                                                 <div class="standing-points-wrap"><span class="standing-movement ${updateClass}">${updateText}</span><span class="overall-tile-points">${points}</span></div>
                                             </div>
