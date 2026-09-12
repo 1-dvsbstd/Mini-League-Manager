@@ -3006,7 +3006,7 @@
             }
 
             // 5. Accolades Card
-            if (false && (data.accolades || topWeeksWonPlayer || computedWeeksLostPlayer)) {
+            if (data.accolades || topWeeksWonPlayer || computedWeeksLostPlayer) {
                 const acc = data.accolades || {};
 
                 const getAccObj = (keys) => {
