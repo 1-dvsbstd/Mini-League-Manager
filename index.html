@@ -2859,6 +2859,7 @@
                                         const scoreDisplay = s.numericScore === null ? '–' : String(s.numericScore);
                                         const teamName = escapeProfileHtml(s.teamName || '');
                                         const paidPlaces = (period.payouts || []).length;
+                                        const prizeRank = idx < paidPlaces ? idx + 1 : 0;
                                         const scoreColour = idx < paidPlaces ? (idx === 0 ? 'var(--gold-color)' : (idx === 1 ? 'var(--silver-color)' : '#d69a65')) : 'var(--text-muted)';
                                         const gameweekPoints = containsLatestGameweek
                                             ? latestGameweekPointsMap[String(s.managerId)]
@@ -2868,7 +2869,7 @@
                                             ? '—'
                                             : `${gameweekPoints >= 0 ? '+' : ''}${gameweekPoints}`;
                                         return `
-                                            <li class="period-standing-row rank-${idx + 1}" style="display: flex; justify-content: space-between; align-items: center;">
+                                            <li class="period-standing-row rank-${prizeRank}" style="display: flex; justify-content: space-between; align-items: center;">
                                                 <div>
                                                     <div style="font-weight: 600; font-size: 0.9rem; color: #ffffff;">${escapeProfileHtml(s.name)}</div>
                                                     ${teamName ? `<div style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500; margin-top: 1px;">${teamName}</div>` : ''}
