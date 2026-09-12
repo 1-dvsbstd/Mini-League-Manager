@@ -1613,7 +1613,7 @@
 
         .period-standing-row.rank-1 { border-color: var(--rank-gold-edge) !important; }
         .period-standing-row.rank-2 { border-color: var(--rank-silver-edge) !important; }
-        .period-standing-row.rank-3,
+        .period-standing-row.rank-3 { border-color: rgba(176, 112, 62, 0.78) !important; }
         .period-standing-row.rank-4 { border-color: rgba(145,163,184,0.28) !important; }
 
         /* Use the exact same base and overlay order as a normal Live GW card. */
@@ -1663,6 +1663,8 @@
             gap: 8px;
             margin-top: 12px;
         }
+        .period-prize-grid.count-1 { grid-template-columns: minmax(0, 220px); justify-content: center; }
+        .period-prize-grid.count-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
         .period-prize {
             padding: 10px 8px;
@@ -1680,6 +1682,8 @@
         .period-prize.winner strong { color: var(--gold-color); }
         .period-prize.runner { color: #edf1f5; border-color: var(--rank-silver-edge); background: linear-gradient(120deg, rgba(255,255,255,0.24), transparent 28%, rgba(255,255,255,0.06) 52%, transparent 74%), linear-gradient(135deg, #343a43, #727d89 52%, #3b424b); box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), 0 6px 18px rgba(0,0,0,0.22); }
         .period-prize.runner strong { color: #ffffff; }
+        .period-prize.third { color: #ead7c2; border-color: rgba(176, 112, 62, 0.78); background: linear-gradient(135deg, #4b2d19, #805332 52%, #4d301d); box-shadow: inset 0 1px 0 rgba(214, 148, 91, 0.26), 0 6px 18px rgba(0,0,0,0.22); }
+        .period-prize.third strong { color: #d69a65; }
         .period-prize span { color: inherit; font-weight: 700; }
 
         .overall-standings-section {
@@ -1899,8 +1903,10 @@
     <script>
         function renderSharedPrizes(competition) {
           const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:2}).format(value);
-          if(competition.complete) return (competition.awards||[]).map(a=>'<div class="period-prize winner"><strong>Confirmed award</strong>'+escapeProfileHtml(a.managerName)+' <span>– '+money(a.prize)+'</span></div>').join('') || '<div class="period-prize"><strong>Final</strong>No awards recorded.</div>';
-          return (competition.payouts||[]).map((amount,index)=>'<div class="period-prize '+(index?'runner':'winner')+'"><strong>'+(['Winner','Runner-up'][index]||'Place '+(index+1))+'</strong>To be confirmed <span>– '+money(amount)+'</span></div>').join('');
+          const count=(competition.complete?(competition.awards||[]):(competition.payouts||[])).length;
+          const wrapStart='<div class="period-prize-grid count-'+count+'">', wrapEnd='</div>';
+          if(competition.complete) return wrapStart+((competition.awards||[]).map((a,index)=>'<div class="period-prize '+(index===0?'winner':index===1?'runner':'third')+'"><strong>'+(['Winner','Runner-up','Third place'][index]||'Place '+(index+1))+'</strong>'+escapeProfileHtml(a.managerName)+' <span>– '+money(a.prize)+'</span></div>').join('') || '<div class="period-prize"><strong>Final</strong>No awards recorded.</div>')+wrapEnd;
+          return wrapStart+(competition.payouts||[]).map((amount,index)=>'<div class="period-prize '+(index===0?'winner':index===1?'runner':'third')+'"><strong>'+(['Winner','Runner-up','Third place'][index]||'Place '+(index+1))+'</strong>To be confirmed <span>– '+money(amount)+'</span></div>').join('')+wrapEnd;
         }
         const query = new URLSearchParams(location.search);
         const leagueKey = (query.get('league') || '').trim().toLowerCase();
@@ -2852,7 +2858,7 @@
                                     ${rankedPeriodScores.map((s, idx) => {
                                         const scoreDisplay = s.numericScore === null ? '–' : String(s.numericScore);
                                         const teamName = escapeProfileHtml(s.teamName || '');
-                                        const scoreColour = idx === 0 ? 'var(--gold-color)' : (idx === 1 ? 'var(--silver-color)' : 'var(--text-color)');
+                                        const scoreColour = idx === 0 ? 'var(--gold-color)' : (idx === 1 ? 'var(--silver-color)' : (idx === 2 ? '#d69a65' : 'var(--text-color)'));
                                         const gameweekPoints = containsLatestGameweek
                                             ? latestGameweekPointsMap[String(s.managerId)]
                                             : null;
@@ -2871,9 +2877,7 @@
                                         `;
                                     }).join('')}
                                 </ul>
-                                <div class="period-prize-grid">
-                                    ${renderSharedPrizes(period)}
-                                </div>
+                                ${renderSharedPrizes(period)}
                             </div>
                         `;
                     });
@@ -2953,9 +2957,7 @@
                                         `;
                                     }).join('')}
                         </div>
-                        <div class="period-prize-grid">
-                            ${renderSharedPrizes(data.overall)}
-                        </div>
+                        ${renderSharedPrizes(data.overall)}
                     </div>
                 `;
             }
