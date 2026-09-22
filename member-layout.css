@@ -1,0 +1,43 @@
+/* Keep the familiar detailed cards in a compact, phone-sized browsing area. */
+.manager-wheel.is-scrollable {
+    max-height: min(640px, calc(100svh - 180px));
+    min-height: 280px;
+    overflow-y: auto;
+    scroll-snap-type: y proximity;
+    scrollbar-width: thin;
+    scrollbar-color: #d1b36d #171422;
+    padding: 3px 5px 12px 3px;
+}
+.manager-wheel > .manager-item { scroll-snap-align: start; }
+.manager-wheel:has(.expanded) { scroll-snap-type: none; }
+.manager-wheel:focus-visible { outline: 2px solid #d1b36d; outline-offset: -2px; }
+.standings-wheel.is-scrollable { max-height: min(440px, calc(100svh - 240px)); overflow-y: auto; scroll-snap-type: y proximity; scrollbar-width: thin; scrollbar-color: #d1b36d #171422; }
+.standings-wheel > * { scroll-snap-align: start; }
+.standings-wheel:focus-visible { outline: 2px solid #d1b36d; outline-offset: 2px; }
+[data-jump-section] { scroll-margin-top: 16px; }
+.next-section {
+    position: fixed;
+    z-index: 50;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(18px, env(safe-area-inset-bottom));
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #d1b36d;
+    background: #211b2e;
+    color: #e4c985;
+    box-shadow: 0 4px 18px #0008;
+    cursor: pointer;
+    font-size: 30px;
+}
+.next-section[hidden] { display: none; }
+.next-section:hover { background: #3b304a; }
+.next-section:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+body { padding-bottom: 80px; }
+.league-loading { display: grid; justify-items: center; gap: 14px; color: #d1b36d; text-align: center; padding: 24px; }
+.league-loading > span:last-child { color: #aab2c6; font-size: .85rem; }
+.loading-ring { width: 34px; height: 34px; border: 2px solid #d1b36d33; border-top-color: #d1b36d; border-radius: 50%; animation: league-spin 1s linear infinite; }
+@keyframes league-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-ring { animation: none; } }
