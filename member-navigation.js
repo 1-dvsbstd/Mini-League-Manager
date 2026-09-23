@@ -13,9 +13,21 @@
             const label = 'Jump to ' + next.dataset.jumpSection;
             button.setAttribute('aria-label', label);
             button.title = label;
+            button.classList.toggle('return-to-top', next.getBoundingClientRect().top <= 40);
         }
     }
-    window.MemberNavigation = { refresh };
+    function captureScroll() {
+        return new Map([...document.querySelectorAll('[data-scroll-key]')]
+            .filter(element => !element.closest('[aria-hidden="true"]'))
+            .map(element => [element.dataset.scrollKey, element.scrollTop]));
+    }
+    function restoreScroll(positions) {
+        if (!positions) return;
+        document.querySelectorAll('[data-scroll-key]').forEach(element => {
+            if (positions.has(element.dataset.scrollKey)) element.scrollTop = positions.get(element.dataset.scrollKey);
+        });
+    }
+    window.MemberNavigation = { refresh, captureScroll, restoreScroll };
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('next-section').addEventListener('click', () => {
             const next = destination();
@@ -31,4 +43,5 @@
         pending = true;
         requestAnimationFrame(() => { pending = false; refresh(); });
     }, { passive: true });
+    window.addEventListener('resize', refresh);
 })();
