@@ -19,7 +19,8 @@
     });
     const overallRanks=new Map(rank(managers,'overallPoints').map(m=>[m.managerId,m.place]));
     const standings=rank(managers,'netPoints').map(m=>({...m,uiMeta:{notParticipating:m.notStarted,upcoming,weeklyRank:data.coverage.currentGameweekComplete===true?m.place:null,overallRank:data.coverage.complete===true?overallRanks.get(m.managerId):null,rankMovement:null,form:[null,null,null,null,null],fiveGwAverage:null}}));
-    const monthly=data.prizes.recurring.periods.filter(p=>number(p.pot)>0).map(p=>{
+    // Show only periods that have begun; an upcoming GW has not started scoring yet.
+    const monthly=data.prizes.recurring.periods.filter(p=>number(p.pot)>0&&number(p.startGw)>=1&&current!==null&&(upcoming?number(p.startGw)<current:number(p.startGw)<=current)).map(p=>{
       const final=data.periodHistory.find(h=>String(h.id)===String(p.id)&&h.complete===true);
       const live=String(data.currentPeriod?.id)===String(p.id)?data.currentPeriod:null;
       const result=final||live;
