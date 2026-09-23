@@ -19,8 +19,11 @@
     });
     const overallRanks=new Map(rank(managers,'overallPoints').map(m=>[m.managerId,m.place]));
     const standings=rank(managers,'netPoints').map(m=>({...m,uiMeta:{notParticipating:m.notStarted,upcoming,weeklyRank:data.coverage.currentGameweekComplete===true?m.place:null,overallRank:data.coverage.complete===true?overallRanks.get(m.managerId):null,rankMovement:null,form:[null,null,null,null,null],fiveGwAverage:null}}));
-    // Show only periods that have begun; an upcoming GW has not started scoring yet.
-    const monthly=data.prizes.recurring.periods.filter(p=>number(p.pot)>0&&number(p.startGw)>=1&&current!==null&&(upcoming?number(p.startGw)<current:number(p.startGw)<=current)).map(p=>{
+    // Keep the opening period available before launch; later periods stay hidden.
+    const paidPeriods=data.prizes.recurring.periods.filter(p=>number(p.pot)>0&&number(p.startGw)>=1).sort((a,b)=>Number(a.startGw)-Number(b.startGw));
+    const startedPeriods=paidPeriods.filter(p=>current!==null&&(upcoming?number(p.startGw)<current:number(p.startGw)<=current));
+    const visiblePeriods=startedPeriods.length?startedPeriods:paidPeriods.slice(0,1);
+    const monthly=visiblePeriods.map(p=>{
       const final=data.periodHistory.find(h=>String(h.id)===String(p.id)&&h.complete===true);
       const live=String(data.currentPeriod?.id)===String(p.id)?data.currentPeriod:null;
       const result=final||live;
