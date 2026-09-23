@@ -33,6 +33,7 @@
     font-size: 30px;
 }
 .next-section[hidden] { display: none; }
+.next-section.return-to-top span { transform: rotate(180deg); }
 .next-section:hover { background: #3b304a; }
 .next-section:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 body { padding-bottom: 80px; }
