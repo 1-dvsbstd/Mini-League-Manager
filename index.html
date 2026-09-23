@@ -2489,6 +2489,7 @@
 
         function renderApp(data) {
             const appDiv = document.getElementById('app');
+            const savedListPositions = window.MemberNavigation?.captureScroll();
             let html = '';
             const expandedManagerCardKeys = getExpandedManagerCardKeys();
             const previewParams = new URLSearchParams(window.location.search);
@@ -2606,7 +2607,7 @@
                         return (pB ?? -Infinity) - (pA ?? -Infinity);
                     });
 
-                    html += `<div class="carousel-card" id="gw-slide-${gwIdx}"><div class="manager-wheel ${standings.length > 5 ? 'is-scrollable' : ''}" ${standings.length > 5 ? 'tabindex="0" role="region"' : ''} aria-label="Gameweek ${gwGroup.gameweek}: ${standings.length} managers">`;
+                    html += `<div class="carousel-card" id="gw-slide-${gwIdx}"><div data-scroll-key="gw-${gwGroup.gameweek}" class="manager-wheel ${standings.length > 5 ? 'is-scrollable' : ''}" ${standings.length > 5 ? 'tabindex="0" role="region"' : ''} aria-label="Gameweek ${gwGroup.gameweek}: ${standings.length} managers">`;
 
                     standings.forEach((mgr, managerIndex) => {
                         const managerName = escapeProfileHtml(mgr.managerName || mgr.name || '');
@@ -2816,7 +2817,7 @@
 
                         html += `
                             <div class="carousel-card period-slide-card" id="period-slide-${periodIndex}" data-period-title="${cleanTitle}" data-end-gw="${period.endGw}">
-                                <ul class="standings-wheel ${rankedPeriodScores.length > 5 ? 'is-scrollable' : ''}" ${rankedPeriodScores.length > 5 ? 'tabindex="0" aria-label="Monthly standings"' : ''} style="list-style: none; padding: 0; margin: 0 0 14px 0;">
+                                <ul data-scroll-key="period-${period.startGw}-${period.endGw}" class="standings-wheel ${rankedPeriodScores.length > 5 ? 'is-scrollable' : ''}" ${rankedPeriodScores.length > 5 ? 'tabindex="0" aria-label="Monthly standings"' : ''} style="list-style: none; padding: 0; margin: 0 0 14px 0;">
                                     ${rankedPeriodScores.map((s, idx) => {
                                         const scoreDisplay = s.numericScore === null ? '–' : String(s.numericScore);
                                         const teamName = escapeProfileHtml(s.teamName || '');
@@ -2902,7 +2903,7 @@
                         <div class="overall-standings-head">
                             <span>Manager</span><span>Points</span>
                         </div>
-                        <div class="overall-standing-list standings-wheel ${data.overall.rows.length > 5 ? 'is-scrollable' : ''}" ${data.overall.rows.length > 5 ? 'tabindex="0" role="region" aria-label="Overall standings"' : ''}>
+                        <div data-scroll-key="overall" class="overall-standing-list standings-wheel ${data.overall.rows.length > 5 ? 'is-scrollable' : ''}" ${data.overall.rows.length > 5 ? 'tabindex="0" role="region" aria-label="Overall standings"' : ''}>
                                     ${data.overall.rows.map((row, rIdx) => {
                                         const paidPlaces = (data.overall.payouts || []).length;
                                         const prizeRank = rIdx < paidPlaces ? rIdx + 1 : 0;
@@ -2932,6 +2933,7 @@
             if(!data.managerProfiles?.length) html += '<div class="tracker-shell"><div class="section-title">Manager Profiles &amp; Season Records</div><div class="card"><p>These original app features are awaiting shared-backend data.</p></div></div>';
 
             appDiv.innerHTML = html;
+            window.MemberNavigation?.restoreScroll(savedListPositions);
             window.MemberNavigation?.refresh();
 
             document.querySelectorAll('.support-panel table:has(th:nth-child(5)) tbody tr').forEach(row => {
@@ -2957,17 +2959,19 @@
         }
 
         function enableEdgeWrapSwipe(track, getCurrentIndex, getTotalSlides, moveSlide) {
-            let touchStartX = null;
+            let touchStartX = null, touchStartY = null;
 
             track.addEventListener('touchstart', event => {
                 touchStartX = event.touches && event.touches[0] ? event.touches[0].clientX : null;
+                touchStartY = event.touches && event.touches[0] ? event.touches[0].clientY : null;
             }, { passive: true });
 
             track.addEventListener('touchend', event => {
                 if (touchStartX === null || !event.changedTouches || !event.changedTouches[0]) return;
                 const distance = event.changedTouches[0].clientX - touchStartX;
-                touchStartX = null;
-                if (Math.abs(distance) < 45) return;
+                const vertical = event.changedTouches[0].clientY - touchStartY;
+                touchStartX = touchStartY = null;
+                if (Math.abs(distance) < 45 || Math.abs(vertical) >= Math.abs(distance)) return;
 
                 const currentIndex = getCurrentIndex();
                 const totalSlides = getTotalSlides();
@@ -2990,6 +2994,7 @@
                 firstLoopClone.id = 'gw-slide-loop-first';
                 firstLoopClone.classList.add('gw-loop-clone');
                 firstLoopClone.setAttribute('aria-hidden', 'true');
+                firstLoopClone.inert = true;
                 track.appendChild(firstLoopClone);
             }
 
