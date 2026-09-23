@@ -155,39 +155,6 @@
             transition: opacity 0.4s ease-out;
         }
 
-        #splash-screen img {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        @media (min-width: 700px) {
-            #splash-screen {
-                overflow: hidden;
-                background: #070510;
-            }
-
-            #splash-screen::before {
-                content: '';
-                position: absolute;
-                inset: -22px;
-                background:
-                    linear-gradient(rgba(5,3,12,0.55), rgba(5,3,12,0.7)),
-                    url('splash-bg.png') center center / cover no-repeat;
-                filter: blur(14px);
-                transform: scale(1.04);
-            }
-
-            #splash-screen img {
-                width: auto;
-                max-width: 100%;
-                object-fit: contain;
-                box-shadow: 0 0 55px rgba(0,0,0,0.7);
-            }
-        }
-
         .fade-out {
             opacity: 0;
             pointer-events: none;
@@ -1876,16 +1843,17 @@
             .detail-row { grid-template-columns: 74px minmax(0, 1fr) auto; gap: 7px; }
         }
     </style>
+    <link rel="stylesheet" href="member-layout.css">
 </head>
 <body>
 
     <!-- Splash Screen Overlay -->
     <div id="splash-screen">
-        <img src="splash-bg.png" alt="Loading" onerror="this.parentElement.style.display='none'">
+        <div class="league-loading" role="status"><span class="loading-ring" aria-hidden="true"></span><strong>Loading your league</strong><span>Standings, prizes and season records</span></div>
     </div>
 
     <h1 id="league-heading">Your league</h1>
-    <div class="update-timestamp">Local transfer preview · original app layout</div>
+    <div class="update-timestamp">Your league, at a glance</div>
 
     <div id="data-status-notice" class="data-status-notice" role="status" aria-live="polite"></div>
 
@@ -1898,8 +1866,11 @@
 
     <div id="timestamp" class="update-timestamp" style="margin-top: 20px; margin-bottom: 0;"></div>
 
+    <button id="next-section" class="next-section" hidden aria-label="Next section"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 7 5 5 5-5M7 13l5 5 5-5"/></svg></button>
+    <script src="member-navigation.js"></script>
     <script src="adapter.js"></script>
     <script src="squad.js"></script>
+    <script src="tracker-loader.js"></script>
     <script>
         function renderSharedPrizes(competition) {
           const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:2}).format(value);
@@ -2073,37 +2044,28 @@
 
         // The shared adapter supplies ranks; a partial history cannot imply form.
         function decorateGameweekData() {}
+        let trackerLoader = null;
         async function loadTrackerData() {
-          const ticket=++loadSerial;loadController?.abort();loadController=new AbortController();
-          const controller=loadController,timeout=setTimeout(()=>controller.abort(),25000);
-          try {
-            if(!/^[a-z0-9]{8}$/.test(leagueKey)||!SOURCES[sourceName]) throw new Error('Open the shared link supplied by your league organiser.');
-            const url=new URL(SOURCES[sourceName]);url.searchParams.set('action','getTrackerData');url.searchParams.set('leagueKey',leagueKey);
-            const response=await fetch(url,{signal:controller.signal,cache:'no-store',credentials:'omit'});
-            if(!response.ok)throw new Error('League data is temporarily unavailable.');
-            const raw=await response.json();if(ticket!==loadSerial)return;
-            let historyData,historyWarning='';
-            if(raw.capabilities?.history===1){
-              try{
-                const historyUrl=new URL(SOURCES[sourceName]);historyUrl.searchParams.set('action','getTrackerHistory');historyUrl.searchParams.set('leagueKey',leagueKey);
-                const historyResponse=await fetch(historyUrl,{signal:controller.signal,cache:'no-store',credentials:'omit'});
-                if(!historyResponse.ok)throw new Error('History unavailable');
-                historyData=await historyResponse.json();
-                window.LeagueAdapter.adapt(raw,leagueKey,historyData);
-              }catch{historyData=undefined;historyWarning=' Full gameweek history could not be loaded.';}
-            }
-            if(ticket!==loadSerial)return;
-            const data=window.LeagueAdapter.adapt(raw,leagueKey,historyData);
-            document.getElementById('league-heading').textContent=raw.league.name;
-            squadContext={seasonKey:raw.season.key,enabled:raw.capabilities?.squad===1};
-            document.title=raw.league.name+' · League app';loadedLeagueData=data;renderApp(data);hasRenderedTrackerData=true;
-            document.querySelectorAll('.manager-item.expanded').forEach(loadManagerSquad);
-            document.getElementById('timestamp').textContent='Updated: '+new Date(raw.dataUpdatedAt).toLocaleString();notice(data.notice+historyWarning);
-          }catch(error){
-            if(ticket!==loadSerial)return;
-            notice(hasRenderedTrackerData?'Could not refresh. Showing the previously loaded results; check their update time.':error.name==='AbortError'?'The league took too long to respond. Reload to try again.':error.message);
-            if(!hasRenderedTrackerData)document.getElementById('app').innerHTML='<div class="card"><p>League data could not be loaded.</p></div>';
-          }finally{clearTimeout(timeout);if(ticket===loadSerial)hideSplash();}
+          if(!/^[a-z0-9]{8}$/.test(leagueKey)||!SOURCES[sourceName]) {
+            notice('Open the shared link supplied by your league organiser.');hideSplash();return;
+          }
+          if(!trackerLoader){
+            let storage;try{storage=window.localStorage;}catch{}
+            trackerLoader=window.TrackerLoader.create({endpoint:SOURCES[sourceName],leagueKey,storage,
+              adapt:window.LeagueAdapter.adapt,
+              render(raw,data,stale){
+                ++loadSerial;
+                document.getElementById('league-heading').textContent=raw.league.name;
+                squadContext={seasonKey:raw.season.key,enabled:raw.capabilities?.squad===1};
+                document.title=raw.league.name+' · League app';loadedLeagueData=data;renderApp(data);hasRenderedTrackerData=true;
+                document.getElementById('timestamp').textContent='Updated: '+new Date(raw.dataUpdatedAt).toLocaleString();
+                notice(data.notice+(stale?' Showing saved results while refreshing.':''));hideSplash();
+                if(!stale)document.querySelectorAll('.manager-item.expanded').forEach(loadManagerSquad);
+              },
+              status(message,failed){notice(message);if(failed)document.getElementById('app').innerHTML='<div class="card"><p>League data could not be loaded. <button type="button" onclick="loadTrackerData()">Try again</button></p></div>';hideSplash();}
+            });
+          }
+          return trackerLoader.load();
         }
 
         function toggleManagerCard(card) {
@@ -2441,7 +2403,7 @@
             };
 
             let carousel = `
-                <div class="profile-carousel-shell">
+                <div class="profile-carousel-shell" id="records-section" data-jump-section="Season records">
                     <div class="profile-carousel-header">
                         <button id="prevProfileBtn" class="carousel-nav-btn" onclick="moveProfileSlide(-1)" aria-label="Previous profile">‹ Prev</button>
                         <div id="profileSlideTitle" class="profile-carousel-title">Season Records</div>
@@ -2527,6 +2489,7 @@
 
         function renderApp(data) {
             const appDiv = document.getElementById('app');
+            const savedListPositions = window.MemberNavigation?.captureScroll();
             let html = '';
             const expandedManagerCardKeys = getExpandedManagerCardKeys();
             const previewParams = new URLSearchParams(window.location.search);
@@ -2617,7 +2580,7 @@
 
             if (gwDataStore.length > 0) {
                 totalGwSlides = gwDataStore.length;
-                html += `<div class="gw-shell">`;
+                html += `<div class="gw-shell" id="managers-section" data-jump-section="Managers">`;
                 
                 html += `
                     <div class="gw-carousel-header">
@@ -2644,7 +2607,7 @@
                         return (pB ?? -Infinity) - (pA ?? -Infinity);
                     });
 
-                    html += `<div class="carousel-card" id="gw-slide-${gwIdx}">`;
+                    html += `<div class="carousel-card" id="gw-slide-${gwIdx}"><div data-scroll-key="gw-${gwGroup.gameweek}" class="manager-wheel ${standings.length > 5 ? 'is-scrollable' : ''}" ${standings.length > 5 ? 'tabindex="0" role="region"' : ''} aria-label="Gameweek ${gwGroup.gameweek}: ${standings.length} managers">`;
 
                     standings.forEach((mgr, managerIndex) => {
                         const managerName = escapeProfileHtml(mgr.managerName || mgr.name || '');
@@ -2792,7 +2755,7 @@
                         `;
                     });
 
-                    html += `</div>`;
+                    html += `</div></div>`;
                 });
 
                 html += `</div></div>`;
@@ -2813,7 +2776,7 @@
 
                 if (activePeriods.length > 0) {
                     totalPeriodSlides = activePeriods.length;
-                    html += `<div class="tracker-shell"><div class="section-title">Manager of the Month</div>`;
+                    html += `<div class="tracker-shell" id="monthly-section" data-jump-section="Manager of the Month"><div class="section-title">Manager of the Month</div>`;
 
                     html += `
                         <div class="period-carousel-header ${activePeriods.length === 1 ? 'single-period' : ''}">
@@ -2854,7 +2817,7 @@
 
                         html += `
                             <div class="carousel-card period-slide-card" id="period-slide-${periodIndex}" data-period-title="${cleanTitle}" data-end-gw="${period.endGw}">
-                                <ul style="list-style: none; padding: 0; margin: 0 0 14px 0;">
+                                <ul data-scroll-key="period-${period.startGw}-${period.endGw}" class="standings-wheel ${rankedPeriodScores.length > 5 ? 'is-scrollable' : ''}" ${rankedPeriodScores.length > 5 ? 'tabindex="0" aria-label="Monthly standings"' : ''} style="list-style: none; padding: 0; margin: 0 0 14px 0;">
                                     ${rankedPeriodScores.map((s, idx) => {
                                         const scoreDisplay = s.numericScore === null ? '–' : String(s.numericScore);
                                         const teamName = escapeProfileHtml(s.teamName || '');
@@ -2935,12 +2898,12 @@
                 };
 
                 html += `
-                    <div class="overall-standings-section">
+                    <div class="overall-standings-section" id="overall-section" data-jump-section="Overall standings">
                         <div class="section-title" style="margin-bottom: 16px;">Overall Standings</div>
                         <div class="overall-standings-head">
                             <span>Manager</span><span>Points</span>
                         </div>
-                        <div class="overall-standing-list">
+                        <div data-scroll-key="overall" class="overall-standing-list standings-wheel ${data.overall.rows.length > 5 ? 'is-scrollable' : ''}" ${data.overall.rows.length > 5 ? 'tabindex="0" role="region" aria-label="Overall standings"' : ''}>
                                     ${data.overall.rows.map((row, rIdx) => {
                                         const paidPlaces = (data.overall.payouts || []).length;
                                         const prizeRank = rIdx < paidPlaces ? rIdx + 1 : 0;
@@ -2966,133 +2929,12 @@
                 `;
             }
 
-            // 4. Transfer Market season totals
-            if (false && Array.isArray(data.transferMarket) && data.transferMarket.length > 0) {
-                const signed = value => `${Number(value) > 0 ? '+' : ''}${Number(value) || 0}`;
-                const netColour = value => Number(value) > 0 ? 'var(--primary-color)' : (Number(value) < 0 ? 'var(--danger-color)' : 'var(--text-muted)');
-                html += `<div class="card support-panel" style="margin-top:24px;"><div class="section-title" style="margin-bottom:16px;">Transfer Market</div><div style="overflow-x:auto;"><table style="width:100%;table-layout:fixed;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid var(--border-subtle);color:var(--text-muted);font-size:.62rem;text-transform:uppercase;letter-spacing:.7px;"><th style="width:34%;padding:0 2px 10px;text-align:left;">Manager</th><th style="width:18%;padding:0 2px 10px;text-align:center;">Transfers</th><th style="width:14%;padding:0 2px 10px;text-align:center;">Hits</th><th style="width:16%;padding:0 2px 10px;text-align:center;">Points</th><th style="width:18%;padding:0 2px 10px;text-align:right;">Net</th></tr></thead><tbody>${data.transferMarket.map(row => `<tr style="border-bottom:1px solid var(--border-subtle);font-size:.78rem;"><td style="padding:11px 2px;color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${row.managerName}</td><td style="padding:11px 2px;text-align:center;">${Number(row.transfers)||0}</td><td style="padding:11px 2px;text-align:center;color:${Number(row.hits)>0?'var(--danger-color)':'var(--text-muted)'};">${Number(row.hits)>0?'-'+Number(row.hits):'0'}</td><td style="padding:11px 2px;text-align:center;">${signed(row.points)}</td><td style="padding:11px 2px;text-align:right;font-weight:900;color:${netColour(row.net)};">${signed(row.net)}</td></tr>`).join('')}</tbody></table></div></div>`;
-            }
-
-            // 5. Dynamic Calculation for Most Weeks Lost (Fallback)
-            let computedWeeksLostPlayer = null;
-            if (data.monthly && data.monthly.length > 0) {
-                const bottomCounts = {};
-                let maxLostCount = 0;
-
-                data.monthly.forEach(period => {
-                    if (period.scores && period.scores.length > 0) {
-                        const validScores = period.scores.filter(s => s.score !== undefined && s.score !== null && !isNaN(Number(s.score)) && Number(s.score) > 0);
-                        if (validScores.length > 0) {
-                            let minScore = Math.min(...validScores.map(s => Number(s.score)));
-                            validScores.forEach(s => {
-                                if (Number(s.score) === minScore) {
-                                    bottomCounts[s.name] = (bottomCounts[s.name] || 0) + 1;
-                                    if (bottomCounts[s.name] > maxLostCount) {
-                                        maxLostCount = bottomCounts[s.name];
-                                    }
-                                }
-                            });
-                        }
-                    }
-                });
-
-                if (maxLostCount > 0) {
-                    const tiedPlayers = Object.keys(bottomCounts).filter(p => bottomCounts[p] === maxLostCount);
-                    computedWeeksLostPlayer = {
-                        player: tiedPlayers.join(' / '),
-                        val: maxLostCount
-                    };
-                }
-            }
-
-            // 5. Accolades Card
-            if (data.accolades || topWeeksWonPlayer || computedWeeksLostPlayer) {
-                const acc = data.accolades || {};
-
-                const getAccObj = (keys) => {
-                    for (let k of keys) {
-                        if (acc[k] && (acc[k].player || acc[k].val !== undefined || acc[k].value !== undefined)) {
-                            return acc[k];
-                        }
-                    }
-                    return null;
-                };
-
-                const highestScore = getAccObj(['highestScore']);
-                const lowestScore = getAccObj(['lowestScore']);
-                const mostWeeksWon = getAccObj(['mostWeeksWon', 'weeksWon']) || topWeeksWonPlayer;
-                const mostWeeksLost = getAccObj(['mostWeeksLost', 'mostWeeksLast', 'weeksLost']) || computedWeeksLostPlayer;
-                const mostTransfers = getAccObj(['mostTransfers', 'highestTotalTransfers', 'transfers']);
-                const highestTransferCost = getAccObj(['highestTotalHit', 'biggestHit', 'highestTransferCost']);
-
-                const formatSub = (item) => {
-                    if (!item || !item.player) return 'N/A';
-                    return item.player + (item.gw ? ` (${item.gw})` : '');
-                };
-
-                const formatVal = (item, type) => {
-                    if (!item) return '0';
-                    const val = item.val !== undefined ? item.val : (item.value !== undefined ? item.value : item);
-                    if (val === undefined || val === null || val === '') return '0';
-                    if (type === 'cost') {
-                        const num = Number(val);
-                        return num > 0 ? '-' + num : String(num);
-                    }
-                    return String(val);
-                };
-
-                const transferMarketSub = (() => {
-                    if (!highestTransferCost || !highestTransferCost.player || highestTransferCost.player === 'N/A') return 'N/A';
-                    const values = Array.isArray(highestTransferCost.netByPlayer) ? highestTransferCost.netByPlayer : [];
-                    if (values.length === 0) return formatSub(highestTransferCost);
-                    return values.map(item => {
-                        const net = Number(item.val) || 0;
-                        const colour = net > 0 ? 'var(--primary-color)' : (net < 0 ? 'var(--danger-color)' : 'var(--text-muted)');
-                        return `<span style="color:${colour};">${item.player} ${net > 0 ? '+' : ''}${net} net</span>`;
-                    }).join(' · ');
-                })();
-
-                html += `
-                    <div class="card support-panel" style="margin-top: 24px;">
-                        <div class="section-title" style="margin-bottom: 16px;">Accolades</div>
-                        <ul style="list-style: none; padding: 0; margin: 0;">
-                            <li style="display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-subtle);">
-                                <div>
-                                    <div style="font-weight: 600; font-size: 0.88rem; color: #ffffff;">🔥 Highest GW Score</div>
-                                    <div style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500; margin-top: 2px;">${formatSub(highestScore)}</div>
-                                </div>
-                                <span style="font-weight: 800; font-size: 1rem; color: var(--primary-color);">${formatVal(highestScore)}</span>
-                            </li>
-                            <li style="display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-subtle);">
-                                <div>
-                                    <div style="font-weight: 600; font-size: 0.88rem; color: #ffffff;">🧊 Lowest GW Score</div>
-                                    <div style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500; margin-top: 2px;">${formatSub(lowestScore)}</div>
-                                </div>
-                                <span style="font-weight: 800; font-size: 1rem; color: var(--ice-blue);">${formatVal(lowestScore)}</span>
-                            </li>
-                            <li style="display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-subtle);">
-                                <div>
-                                    <div style="font-weight: 600; font-size: 0.88rem; color: #ffffff;">🏆 Most Weeks Won</div>
-                                    <div style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500; margin-top: 2px;">${formatSub(mostWeeksWon)}</div>
-                                </div>
-                                <span style="font-weight: 800; font-size: 1rem; color: var(--gold-color);">${formatVal(mostWeeksWon)}</span>
-                            </li>
-                            <li style="display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-subtle);">
-                                <div>
-                                    <div style="font-weight: 600; font-size: 0.88rem; color: #ffffff;">💩 Most Weeks Lost</div>
-                                    <div style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500; margin-top: 2px;">${formatSub(mostWeeksLost)}</div>
-                                </div>
-                                <span style="font-weight: 800; font-size: 1rem; color: var(--danger-color);">${formatVal(mostWeeksLost)}</span>
-                            </li>
-                        </ul>
-                    </div>
-                `;
-            }
-
             html += buildManagerProfileCarousel(data);
             if(!data.managerProfiles?.length) html += '<div class="tracker-shell"><div class="section-title">Manager Profiles &amp; Season Records</div><div class="card"><p>These original app features are awaiting shared-backend data.</p></div></div>';
 
             appDiv.innerHTML = html;
+            window.MemberNavigation?.restoreScroll(savedListPositions);
+            window.MemberNavigation?.refresh();
 
             document.querySelectorAll('.support-panel table:has(th:nth-child(5)) tbody tr').forEach(row => {
                 const pointsCell = row.cells[3];
@@ -3117,17 +2959,19 @@
         }
 
         function enableEdgeWrapSwipe(track, getCurrentIndex, getTotalSlides, moveSlide) {
-            let touchStartX = null;
+            let touchStartX = null, touchStartY = null;
 
             track.addEventListener('touchstart', event => {
                 touchStartX = event.touches && event.touches[0] ? event.touches[0].clientX : null;
+                touchStartY = event.touches && event.touches[0] ? event.touches[0].clientY : null;
             }, { passive: true });
 
             track.addEventListener('touchend', event => {
                 if (touchStartX === null || !event.changedTouches || !event.changedTouches[0]) return;
                 const distance = event.changedTouches[0].clientX - touchStartX;
-                touchStartX = null;
-                if (Math.abs(distance) < 45) return;
+                const vertical = event.changedTouches[0].clientY - touchStartY;
+                touchStartX = touchStartY = null;
+                if (Math.abs(distance) < 45 || Math.abs(vertical) >= Math.abs(distance)) return;
 
                 const currentIndex = getCurrentIndex();
                 const totalSlides = getTotalSlides();
@@ -3150,6 +2994,7 @@
                 firstLoopClone.id = 'gw-slide-loop-first';
                 firstLoopClone.classList.add('gw-loop-clone');
                 firstLoopClone.setAttribute('aria-hidden', 'true');
+                firstLoopClone.inert = true;
                 track.appendChild(firstLoopClone);
             }
 
@@ -3648,4 +3493,3 @@
 
 </body>
 </html>
-
