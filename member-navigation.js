@@ -1,10 +1,15 @@
 (function () {
     let pending = false;
+    function updateEdges(element) {
+        element.classList.toggle('has-more-above', element.scrollTop > 2);
+        element.classList.toggle('has-more-below', element.scrollTop + element.clientHeight < element.scrollHeight - 2);
+    }
     function destination() {
         const sections = [...document.querySelectorAll('[data-jump-section]')];
         return sections.find(section => section.getBoundingClientRect().top > Math.max(40, innerHeight / 2)) || sections[0];
     }
     function refresh() {
+        document.querySelectorAll('.is-scrollable').forEach(updateEdges);
         const button = document.getElementById('next-section');
         const next = destination();
         if (!button) return;
@@ -44,4 +49,7 @@
         requestAnimationFrame(() => { pending = false; refresh(); });
     }, { passive: true });
     window.addEventListener('resize', refresh);
+    document.addEventListener('scroll', event => {
+        if (event.target.classList?.contains('is-scrollable')) updateEdges(event.target);
+    }, { capture: true, passive: true });
 })();
