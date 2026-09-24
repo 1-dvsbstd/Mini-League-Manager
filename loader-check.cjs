@@ -4,7 +4,7 @@ const turn=()=>new Promise(resolve=>setTimeout(resolve,5));
 function harness(options={}){
  const entries=new Map(),requests=[],renders=[],messages=[];
  const storage={getItem:k=>entries.get(k),setItem:(k,v)=>entries.set(k,v),removeItem:k=>entries.delete(k)};
- const config={endpoint:'https://test.example/api',leagueKey:'sample01',storage,
+ const config={endpoint:'https://test.example/api',leagueKey:'sample01',storage,historyRetries:0,retryDelayMs:0,
   adapt:(raw,key,history)=>{if(raw.leagueKey!==key)throw Error('Wrong league');if(history&&history.leagueKey!==key)throw Error('Wrong history');return {raw,history};},
   render:(raw,data,stale)=>renders.push({raw,data,stale}),status:m=>messages.push(m),
   fetcher:(url,opts)=>new Promise((resolve,reject)=>{requests.push({action:url.searchParams.get('action'),resolve:body=>resolve({ok:true,json:async()=>body}),reject});opts.signal.addEventListener('abort',()=>reject(Error('timeout')));}),...options};
@@ -20,5 +20,13 @@ const raw={ok:true,leagueKey:'sample01',capabilities:{history:1}};
  const denied=harness({storage:{getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}}});const deniedLoad=denied.loader.load();denied.requests[0].resolve({...raw,capabilities:{}});await deniedLoad;assert.equal(denied.renders.length,1);
  const history=harness();const withHistory=history.loader.load();history.requests[0].resolve(raw);await turn();history.requests[1].resolve({leagueKey:'sample01'});await withHistory;assert.equal(history.renders.length,2);assert.ok(history.renders[1].data.history);
  const timeout=harness({timeoutMs:5});await timeout.loader.load();assert.equal(timeout.requests.length,2,'one automatic retry only');assert.equal(timeout.renders.length,0);
+ const retained=harness();let run=retained.loader.load();retained.requests[0].resolve(raw);await turn();retained.requests[1].resolve({leagueKey:'sample01'});await run;
+ const stored=[...retained.entries.values()][0];run=retained.loader.load();retained.requests[2].resolve({...raw,dataUpdatedAt:'newer'});await turn();retained.requests[3].reject(Error('network'));await run;
+ assert.equal([...retained.entries.values()][0],stored,'failed history refresh must preserve last complete snapshot');
+ assert.equal(retained.renders.at(-1).data.history,undefined,'old history must not be paired with newer standings');
+ const recovered=harness({historyRetries:1});run=recovered.loader.load();recovered.requests[0].resolve(raw);await turn();recovered.requests[1].reject(Error('network'));await turn();assert.equal(recovered.requests[2].action,'getTrackerHistory');recovered.requests[2].resolve({leagueKey:'sample01'});await run;assert.ok(recovered.renders.at(-1).data.history);
+ const stopped=harness({historyRetries:1});run=stopped.loader.load();stopped.requests[0].resolve(raw);await turn();stopped.requests[1].resolve({ok:false,code:'LEAGUE_NOT_FOUND'});await run;assert.equal(stopped.requests.length,2,'permanent history error should not retry');
+ const temporary=harness({historyRetries:1});run=temporary.loader.load();temporary.requests[0].resolve(raw);await turn();temporary.requests[1].resolve({ok:false,code:'HISTORY_UNAVAILABLE'});await turn();assert.equal(temporary.requests.length,3);temporary.requests[2].resolve({leagueKey:'sample01'});await run;assert.ok(temporary.renders.at(-1).data.history);
  console.log('PASS: main screen before history, cached first render, source/league isolation, coalesced loads, history failure, storage denied, successful history, bounded timeout/retry.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
