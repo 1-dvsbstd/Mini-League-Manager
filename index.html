@@ -1870,7 +1870,7 @@
     <script src="member-navigation.js"></script>
     <script src="adapter.js?v=motm-opening-20260923"></script>
     <script src="squad.js"></script>
-    <script src="tracker-loader.js"></script>
+    <script src="tracker-loader.js?v=loading-20260924"></script>
     <script>
         function renderSharedPrizes(competition) {
           const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:2}).format(value);
@@ -2104,6 +2104,9 @@
                 if(!response.ok)throw new Error('Squad unavailable. Close and reopen this card to retry.');
                 const squad=window.LeagueSquad.validate(await response.json(),identity);
                 if(ticket!==loadSerial||!card.isConnected)return;
+                // Show the validated squad without waiting for optional transfer history.
+                target.innerHTML=`<div class="live-squad-heading"><span>Squad · GW${gameweek}</span><span>${squad.complete?(squad.finalised?'Final':'Provisional'):'Some player data unavailable'}</span></div>${renderSquadPitch(squad.players,'')}`;
+                target.dataset.loaded='true';
                 let transferHtml='';
                 try {
                     const transferUrl=new URL(SOURCES[sourceName]);transferUrl.searchParams.set('action','getTrackerTransfers');
@@ -2114,8 +2117,7 @@
                         transferHtml=`<div class="squad-transfer-history"><div class="live-squad-heading"><span>Transfers</span><span>${transferData.transfers.length}</span></div>${transferData.transfers.slice(-8).reverse().map(t=>`<div class="transfer-line">GW${Number(t.gameweek)} · ${escapeProfileHtml(t.playerOutId)} → ${escapeProfileHtml(t.playerInId)}${t.wasWildcard?' · Wildcard':''}</div>`).join('')}</div>`;
                     }
                 } catch(error) {}
-                target.innerHTML=`<div class="live-squad-heading"><span>Squad · GW${gameweek}</span><span>${squad.complete?(squad.finalised?'Final':'Provisional'):'Some player data unavailable'}</span></div>${renderSquadPitch(squad.players,'')}${transferHtml}`;
-                target.dataset.loaded='true';
+                if(transferHtml&&ticket===loadSerial&&card.isConnected)target.insertAdjacentHTML('beforeend',transferHtml);
             }catch(error){if(ticket===loadSerial&&card.isConnected)target.textContent=error.name==='AbortError'?'Squad took too long to load. Close and reopen this card to retry.':error.message;}
             finally{clearTimeout(timer);target.dataset.loading='false';}
         }
