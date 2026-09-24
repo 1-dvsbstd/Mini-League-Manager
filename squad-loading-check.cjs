@@ -1,0 +1,8 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync(__dirname+'/index.html','utf8');
+const code=html.slice(html.indexOf('        async function loadManagerSquad('),html.indexOf('        function getExpandedManagerCardKeys('));
+const requests=[],target={dataset:{},innerHTML:'',textContent:'',insertAdjacentHTML(_,html){this.innerHTML+=html}},card={dataset:{cardKey:'5:101'},isConnected:true,querySelector:()=>target};
+const sandbox={squadContext:{enabled:true,seasonKey:'2026-27'},leagueKey:'sample01',loadSerial:1,SOURCES:{test:'https://test.example/'},sourceName:'test',URL,AbortController,setTimeout,clearTimeout,window:{LeagueSquad:{validate:data=>data}},renderSquadPitch:()=>'<div>PITCH READY</div>',escapeProfileHtml:String,fetch:url=>new Promise((resolve,reject)=>requests.push({url,resolve:body=>resolve({ok:true,json:async()=>body}),reject}))};
+vm.createContext(sandbox);vm.runInContext(code,sandbox);
+(async()=>{const run=sandbox.loadManagerSquad(card);requests[0].resolve({complete:true,finalised:true,players:[]});await new Promise(r=>setTimeout(r,0));assert.match(target.innerHTML,/PITCH READY/,'pitch must appear before transfers finish');assert.equal(requests.length,2);requests[1].reject(Error('transfer timeout'));await run;assert.match(target.innerHTML,/PITCH READY/);assert.equal(target.dataset.loaded,'true');assert.equal(target.dataset.loading,'false');console.log('PASS pitch visible while transfers pending and retained after optional transfer failure');})().catch(error=>{console.error(error);process.exitCode=1});
+
