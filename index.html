@@ -2502,6 +2502,7 @@
             totalProfileSlides = 0;
 
             // 1. Gameweek Tracker Carousel Parsing with Deduplication
+            const selectedGameweek = gwDataStore[currentGwSlideIdx]?.gameweek;
             gwDataStore = [];
             let rawGwStore = [];
             if (data.gameweeks && Array.isArray(data.gameweeks) && data.gameweeks.length > 0) {
@@ -2532,6 +2533,10 @@
                 }
             });
             gwDataStore.sort((a, b) => (Number(a.gameweek || a.gw || 0)) - (Number(b.gameweek || b.gw || 0)));
+            if (gwCarouselInitialized) {
+                const selectedIndex = gwDataStore.findIndex(gw => gw.gameweek === selectedGameweek);
+                currentGwSlideIdx = selectedIndex >= 0 ? selectedIndex : Math.max(0, gwDataStore.length - 1);
+            }
 
             // Local-only visual preview for the live player breakdown when no match is active.
             // It changes the in-memory response only; spreadsheet and published data are untouched.
