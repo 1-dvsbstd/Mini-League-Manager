@@ -1870,7 +1870,7 @@
     <script src="member-navigation.js"></script>
     <script src="adapter.js?v=season-history-20260924"></script>
     <script src="squad.js"></script>
-    <script src="tracker-loader.js?v=bundle-test-20260924"></script>
+    <script src="tracker-loader.js?v=loading-diagnostics-20260925"></script>
     <script>
         function renderSharedPrizes(competition) {
           const money=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:2}).format(value);
@@ -2051,7 +2051,7 @@
           }
           if(!trackerLoader){
             let storage;try{storage=window.localStorage;}catch{}
-            trackerLoader=window.TrackerLoader.create({endpoint:SOURCES[sourceName],leagueKey,storage,preferBundle:sourceName==='test',
+            trackerLoader=window.TrackerLoader.create({endpoint:SOURCES[sourceName],leagueKey,storage,preferBundle:sourceName==='test',diagnostics:sourceName==='test',
               adapt:window.LeagueAdapter.adapt,
               render(raw,data,stale){
                 ++loadSerial;
