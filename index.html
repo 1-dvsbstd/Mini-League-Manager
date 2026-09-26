@@ -2051,7 +2051,7 @@
           }
           if(!trackerLoader){
             let storage;try{storage=window.localStorage;}catch{}
-            trackerLoader=window.TrackerLoader.create({endpoint:SOURCES[sourceName],leagueKey,storage,preferBundle:sourceName==='test',diagnostics:sourceName==='test',
+            trackerLoader=window.TrackerLoader.create({endpoint:SOURCES[sourceName],leagueKey,storage,preferBundle:false,diagnostics:sourceName==='test',
               adapt:window.LeagueAdapter.adapt,
               render(raw,data,stale){
                 ++loadSerial;
