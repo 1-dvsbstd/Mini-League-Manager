@@ -7,7 +7,7 @@ function harness(options={}){
  const config={endpoint:'https://test.example/api',leagueKey:'sample01',storage,historyRetries:0,retryDelayMs:0,
   adapt:(raw,key,history)=>{if(raw.leagueKey!==key)throw Error('Wrong league');if(history&&history.leagueKey!==key)throw Error('Wrong history');return {raw,history};},
   render:(raw,data,stale)=>renders.push({raw,data,stale}),status:m=>messages.push(m),
-  fetcher:(url,opts)=>new Promise((resolve,reject)=>{requests.push({action:url.searchParams.get('action'),resolve:body=>resolve({ok:true,json:async()=>body}),reject});opts.signal.addEventListener('abort',()=>reject(Error('timeout')));}),...options};
+  fetcher:(url,opts)=>new Promise((resolve,reject)=>{requests.push({url:String(url),action:url.searchParams.get('action'),resolve:body=>resolve({ok:true,json:async()=>body}),reject});opts.signal.addEventListener('abort',()=>reject(Error('timeout')));}),...options};
  return {entries,requests,renders,messages,config,loader:create(config)};
 }
 const raw={ok:true,leagueKey:'sample01',capabilities:{history:1}};
@@ -32,6 +32,10 @@ const raw={ok:true,leagueKey:'sample01',capabilities:{history:1}};
  const partial=harness({preferBundle:true});run=partial.loader.load();partial.requests[0].resolve({ok:true,schemaVersion:1,core:raw,history:{ok:false,code:'HISTORY_UNAVAILABLE'}});await turn();assert.equal(partial.renders.length,1);assert.equal(partial.requests[1].action,'getTrackerHistory');partial.requests[1].resolve({ok:true,leagueKey:'sample01'});await run;assert.ok(partial.renders.at(-1).data.history);
  const wrong=harness({preferBundle:true});run=wrong.loader.load();wrong.requests[0].resolve({ok:true,schemaVersion:1,core:raw,history:{ok:true,leagueKey:'different'}});await turn();assert.equal(wrong.renders[0].data.history,undefined);wrong.requests[1].resolve({ok:true,leagueKey:'sample01'});await run;
  const missing=harness({preferBundle:true});run=missing.loader.load();missing.requests[0].resolve({ok:false,code:'LEAGUE_NOT_FOUND'});await run;assert.equal(missing.requests.length,1);assert.equal(missing.renders.length,0);
+ const fresh=harness({freshRequests:true,now:()=>100});run=fresh.loader.load();fresh.requests[0].reject(Error('network'));await turn();fresh.requests[1].resolve(raw);await turn();fresh.requests[2].resolve({ok:true,leagueKey:'sample01'});await run;
+ const tokens=fresh.requests.map(r=>new URL(r.url).searchParams.get('_request'));
+ assert.ok(tokens.every(Boolean));assert.equal(new Set(tokens).size,3,'retry gets distinct request identity even with a fixed clock');
+ assert.equal(fresh.entries.size,1,'request identity must not fragment saved league snapshots');
+ assert.equal(new URL(h.requests[0].url).searchParams.has('_request'),false,'unchanged by default');
  console.log('PASS standard loading/cache/retry; one-request bundle, old-server fallback, partial/wrong history recovery and permanent error handling.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
-
