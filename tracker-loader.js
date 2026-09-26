@@ -1,8 +1,10 @@
 /* Cached first paint; independent, bounded core/history requests. No credentials stored. */
 (function(root){
-  function create({endpoint,leagueKey,adapt,render,status,fetcher=fetch,storage,preferBundle=false,diagnostics=false,timeoutMs=20000,historyTimeoutMs=30000,historyRetries=1,retryDelayMs=500,now=Date.now}){
+  function create({endpoint,leagueKey,adapt,render,status,fetcher=fetch,storage,preferBundle=false,diagnostics=false,freshRequests=false,timeoutMs=20000,historyTimeoutMs=30000,historyRetries=1,retryDelayMs=500,now=Date.now}){
     const cacheKey='baruc-tracker-v1:'+endpoint+':'+leagueKey;
     let running=null,visible=false,lastComplete=null;
+    const requestPrefix=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+    let requestSequence=0;
     function cached(){try{const c=JSON.parse(storage?.getItem(cacheKey)||'null');return c&&c.endpoint===endpoint&&c.leagueKey===leagueKey&&now()-c.savedAt<7*86400000&&now()>=c.savedAt?c:null;}catch{return null;}}
     function save(raw,history){if(history)lastComplete={raw,history};try{storage?.setItem(cacheKey,JSON.stringify({endpoint,leagueKey,savedAt:now(),raw,history}));}catch{}}
     function trace(event){if(diagnostics)try{console.info('Tracker loading',JSON.stringify(event));}catch{}}
@@ -13,6 +15,9 @@
         let phase='fetch',httpStatus=null;
         try{
           const url=new URL(endpoint);url.searchParams.set('action',action);url.searchParams.set('leagueKey',leagueKey);
+          // Apps Script responses redirect to one-time URLs. Avoid reusing a cached redirect.
+          // This changes only transport URLs; saved snapshots keep their stable cache key.
+          if(freshRequests)url.searchParams.set('_request',requestPrefix+'-'+(++requestSequence));
           const response=await fetcher(url,{signal:controller.signal,cache:'no-store',credentials:'omit'});
           httpStatus=response.status;phase='response';
           if(!response.ok)throw Error('HTTP '+response.status);
